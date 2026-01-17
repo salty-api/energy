@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glendale Home Energy Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.0.0/index.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --solar-gold: #FDB813;
+            --solar-orange: #FF6B35;
+            --energy-blue: #004E89;
+            --deep-blue: #001F3F;
+            --soft-cream: #FFF8F0;
+            --warm-gray: #E8E4DF;
+            --text-dark: #1A1A1A;
+            --text-light: #666;
+            --success-green: #2ECC71;
+            --alert-red: #E74C3C;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, var(--soft-cream) 0%, #FFF 50%, var(--warm-gray) 100%);
+            color: var(--text-dark);
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--solar-orange) 0%, var(--solar-gold) 50%, var(--energy-blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .home-info {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text-light);
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .home-info span {
+            padding: 0.5rem 1rem;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .solar-icon {
+            display: inline-block;
+            font-size: 1.2rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .refresh-btn {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, var(--solar-orange), var(--solar-gold));
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 30px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-50%) scale(1.05);
+            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+        }
+
+        .refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.12);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--solar-orange), var(--solar-gold));
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-light);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--energy-blue);
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-unit {
+            font-size: 1rem;
+            color: var(--text-light);
+            font-weight: 400;
+        }
+
+        .stat-change {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            margin-top: 0.5rem;
+        }
+
+        .stat-change.positive {
+            background: rgba(46, 204, 113, 0.1);
+            color: var(--success-green);
+        }
+
+        .stat-change.negative {
+            background: rgba(231, 76, 60, 0.1);
+            color: var(--alert-red);
+        }
+
+        .anomaly-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: var(--alert-red);
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .anomaly-badge.low {
+            background: var(--success-green);
+        }
+
+        .chart-section {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+            margin-bottom: 2rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--deep-blue);
+        }
+
+        .day-selector {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .day-selector select {
+            font-family: 'Outfit', sans-serif;
+            padding: 0.75rem 1.25rem;
+            border: 2px solid var(--warm-gray);
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23666' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            padding-right: 3rem;
+        }
+
+        .day-selector select:hover {
+            border-color: var(--solar-gold);
+        }
+
+        .day-selector select:focus {
+            outline: none;
+            border-color: var(--solar-orange);
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+        }
+
+        .date-range-selector {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .date-input {
+            font-family: 'Outfit', sans-serif;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--warm-gray);
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .date-input:hover {
+            border-color: var(--solar-gold);
+        }
+
+        .date-input:focus {
+            outline: none;
+            border-color: var(--solar-orange);
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+        }
+
+        .apply-filter-btn, .reset-filter-btn {
+            font-family: 'Outfit', sans-serif;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .apply-filter-btn {
+            background: linear-gradient(135deg, var(--solar-orange), var(--solar-gold));
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+        }
+
+        .apply-filter-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+        }
+
+        .reset-filter-btn {
+            background: white;
+            color: var(--text-dark);
+            border: 2px solid var(--warm-gray);
+        }
+
+        .reset-filter-btn:hover {
+            border-color: var(--energy-blue);
+            color: var(--energy-blue);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 1.5rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-light);
+            font-size: 1.1rem;
+        }
+
+        .loading::after {
+            content: '';
+            display: block;
+            width: 40px;
+            height: 40px;
+            margin: 1rem auto;
+            border: 4px solid var(--warm-gray);
+            border-top-color: var(--solar-orange);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid var(--alert-red);
+            padding: 1.5rem;
+            border-radius: 12px;
+            color: var(--alert-red);
+            margin-bottom: 2rem;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .comparison-card {
+            background: linear-gradient(135deg, rgba(253, 184, 19, 0.05), rgba(255, 107, 53, 0.05));
+            padding: 1.5rem;
+            border-radius: 16px;
+            border: 2px solid rgba(253, 184, 19, 0.2);
+        }
+
+        .comparison-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-light);
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .comparison-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--energy-blue);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .refresh-btn {
+                position: static;
+                transform: none;
+                margin-top: 1rem;
+                width: 100%;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .chart-section {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header>
+            <h1>⚡ Glendale Home Energy</h1>
+            <div class="home-info">
+                <span>🏠 2 Bed · 850 sq ft</span>
+                <span><span class="solar-icon">☀️</span> Solar Powered</span>
+                <span>📍 Glendale, CA</span>
+            </div>
+            <button class="refresh-btn" onclick="loadData()" id="refreshBtn">
+                ↻ Refresh Data
+            </button>
+        </header>
+
+        <div id="loading" class="loading" style="display: none;">
+            Loading energy data...
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="content" style="display: none;">
+            <!-- High Level Stats -->
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <!-- Weekly Overview Chart -->
+            <div class="chart-section">
+                <div class="section-header">
+                    <h2 class="section-title">📊 Weekly Energy Overview</h2>
+                    <div class="date-range-selector">
+                        <input type="date" id="startDate" class="date-input">
+                        <span style="color: var(--text-light); font-weight: 600;">to</span>
+                        <input type="date" id="endDate" class="date-input">
+                        <button class="apply-filter-btn" onclick="applyDateFilter()">Apply</button>
+                        <button class="reset-filter-btn" onclick="resetDateFilter()">Reset</button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="weeklyChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Daily Deep Dive -->
+            <div class="chart-section">
+                <div class="section-header">
+                    <h2 class="section-title">🔍 Daily Deep Dive</h2>
+                    <div class="day-selector">
+                        <select id="daySelector" onchange="updateDailyView()">
+                            <option value="">Select a day...</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="dailyContent">
+                    <div class="chart-container">
+                        <canvas id="hourlyChart"></canvas>
+                    </div>
+                    <div class="comparison-grid" id="comparisonGrid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const SHEET_ID = '1d7Owi4uZqGWnuj_Gl-1Uq3z7CuhuBKdL0rPToG2Zua0';
+        const API_KEY = 'AIzaSyBIgi0MVji-oUAi_81acNLu3XcziwJq8t0';
+        
+        // Global data storage
+        let energyData = [];
+        let filteredData = []; // Stores filtered data based on date range
+        let weeklyChart = null;
+        let hourlyChart = null;
+
+        // Utility functions
+        function parseGoogleSheetsJSON(jsonData) {
+            // Google Sheets API returns data in format: { values: [[row1], [row2], ...] }
+            if (!jsonData.values || jsonData.values.length === 0) {
+                return [];
+            }
+            
+            const rows = jsonData.values;
+            const headers = rows[0]; // First row contains headers
+            
+            // Convert each row to an object with headers as keys
+            return rows.slice(1).map(row => {
+                const rowObj = {};
+                headers.forEach((header, index) => {
+                    rowObj[header] = row[index] || '';
+                });
+                return rowObj;
+            });
+        }
+
+        function parseDate(dateStr) {
+            // Handle various date formats
+            return new Date(dateStr);
+        }
+
+        function formatDate(date) {
+            return date.toLocaleDateString('en-US', { 
+                weekday: 'short', 
+                month: 'short', 
+                day: 'numeric' 
+            });
+        }
+
+        function getDayOfWeek(date) {
+            return date.toLocaleDateString('en-US', { weekday: 'long' });
+        }
+
+        function calculateStats(data) {
+            if (!data || data.length === 0) return null;
+
+            const total = data.reduce((sum, val) => sum + val, 0);
+            const avg = total / data.length;
+            const sorted = [...data].sort((a, b) => a - b);
+            const median = sorted[Math.floor(sorted.length / 2)];
+            const max = Math.max(...data);
+            const min = Math.min(...data);
+            
+            // Calculate standard deviation for anomaly detection
+            const variance = data.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / data.length;
+            const stdDev = Math.sqrt(variance);
+
+            return { total, avg, median, max, min, stdDev };
+        }
+
+        function isAnomaly(value, avg, stdDev, threshold = 1.5) {
+            return Math.abs(value - avg) > threshold * stdDev;
+        }
+
+        // Data loading
+        async function loadData() {
+            const loadingEl = document.getElementById('loading');
+            const errorEl = document.getElementById('error');
+            const contentEl = document.getElementById('content');
+            const refreshBtn = document.getElementById('refreshBtn');
+
+            loadingEl.style.display = 'block';
+            errorEl.style.display = 'none';
+            contentEl.style.display = 'none';
+            refreshBtn.disabled = true;
+
+            try {
+                // First, get the sheet metadata to find the actual sheet name
+                console.log('Fetching sheet metadata...');
+                const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?key=${API_KEY}&fields=sheets.properties`;
+                const metadataResponse = await fetch(metadataUrl);
+                
+                if (!metadataResponse.ok) {
+                    const errorData = await metadataResponse.json().catch(() => ({}));
+                    let errorMsg = `Failed to fetch sheet metadata (Status: ${metadataResponse.status}).`;
+                    
+                    if (metadataResponse.status === 403) {
+                        errorMsg += ' Check that your API key is valid and has the Google Sheets API enabled.';
+                    } else if (metadataResponse.status === 404) {
+                        errorMsg += ' Sheet not found. Check the SHEET_ID.';
+                    }
+                    
+                    if (errorData.error && errorData.error.message) {
+                        errorMsg += `\n\nDetails: ${errorData.error.message}`;
+                    }
+                    
+                    throw new Error(errorMsg);
+                }
+                
+                const metadata = await metadataResponse.json();
+                
+                // Get the first sheet's name
+                if (!metadata.sheets || metadata.sheets.length === 0) {
+                    throw new Error('No sheets found in this spreadsheet.');
+                }
+                
+                const sheetName = metadata.sheets[0].properties.title;
+                console.log('Found sheet name:', sheetName);
+                
+                // Now fetch the actual data using the correct sheet name
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheetName)}!A:Z?key=${API_KEY}`;
+                
+                console.log('Fetching data from Google Sheets API...');
+                
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    let errorMsg = `Failed to fetch data (Status: ${response.status}).`;
+                    
+                    if (response.status === 403) {
+                        errorMsg += ' Check that your API key is valid and has the Google Sheets API enabled.';
+                    } else if (response.status === 404) {
+                        errorMsg += ' Sheet not found. Check the SHEET_ID and sheet range.';
+                    }
+                    
+                    if (errorData.error && errorData.error.message) {
+                        errorMsg += `\n\nDetails: ${errorData.error.message}`;
+                    }
+                    
+                    throw new Error(errorMsg);
+                }
+
+                const jsonData = await response.json();
+                console.log('API response received, rows:', jsonData.values?.length || 0);
+                
+                if (!jsonData.values || jsonData.values.length === 0) {
+                    throw new Error('No data found in the spreadsheet. Make sure your sheet has data.');
+                }
+                
+                const rawData = parseGoogleSheetsJSON(jsonData);
+                console.log('Parsed rows:', rawData.length);
+                
+                // Process the data
+                energyData = rawData.map(row => ({
+                    date: parseDate(row['Reading Date'] || row.Date || row.date),
+                    dailyUsage: parseFloat(row['Total Daily Usage'] || row['Daily Usage (kWh)'] || row.daily_usage || 0),
+                    hourlyData: parseHourlyData(row)
+                })).filter(row => !isNaN(row.date.getTime()) && row.dailyUsage > 0);
+
+                if (energyData.length === 0) {
+                    throw new Error('No valid data found. Please check your spreadsheet format.');
+                }
+
+                // Sort by date
+                energyData.sort((a, b) => a.date - b.date);
+
+                renderDashboard();
+                
+                loadingEl.style.display = 'none';
+                contentEl.style.display = 'block';
+            } catch (error) {
+                console.error('Error loading data:', error);
+                let errorMessage = `⚠️ ${error.message}`;
+                
+                // Check if this is an API-related error
+                if (error.message.includes('403')) {
+                    errorMessage = `⚠️ <strong>API Key Error</strong><br><br>
+                        Your API key may not have the correct permissions.<br><br>
+                        <strong>Check:</strong><br>
+                        1. Google Sheets API is enabled in your project<br>
+                        2. API key restrictions allow Google Sheets API<br>
+                        3. API key is active (not deleted or revoked)<br><br>
+                        <strong>To fix:</strong><br>
+                        Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color: #FF6B35;">Google Cloud Console → Credentials</a><br>
+                        Verify your API key settings.`;
+                } else if (error.message.includes('404')) {
+                    errorMessage = `⚠️ <strong>Sheet Not Found</strong><br><br>
+                        The spreadsheet couldn't be found.<br><br>
+                        <strong>Current Sheet ID:</strong> ${SHEET_ID}<br><br>
+                        Make sure the Sheet ID is correct and the sheet exists.`;
+                }
+                
+                errorEl.innerHTML = errorMessage;
+                errorEl.style.display = 'block';
+                loadingEl.style.display = 'none';
+            } finally {
+                refreshBtn.disabled = false;
+            }
+        }
+
+        function parseHourlyData(row) {
+            const hourlyData = new Array(24).fill(0);
+            
+            // Map the columns to hours (0-23)
+            // The sheet has: 1 am, 2 am, ..., 12 pm, 1 pm, ..., 11 pm, 12 am
+            // We need: 0 (12am), 1 (1am), 2 (2am), ..., 23 (11pm)
+            
+            const hourMapping = [
+                '1 am kwH Usage',   // hour 1
+                '2 am kwH Usage',   // hour 2
+                '3 am kwH Usage',   // hour 3
+                '4 am kwH Usage',   // hour 4
+                '5 am kwH Usage',   // hour 5
+                '6 am kwH Usage',   // hour 6
+                '7 am kwH Usage',   // hour 7
+                '8 am kwH Usage',   // hour 8
+                '9 am kwH Usage',   // hour 9
+                '10 am kwH Usage',  // hour 10
+                '11 am kwH Usage',  // hour 11
+                '12 pm kwH Usage',  // hour 12
+                '1 pm kwH Usage',   // hour 13
+                '2 pm kwH Usage',   // hour 14
+                '3 pm kwH Usage',   // hour 15
+                '4 pm kwH Usage',   // hour 16
+                '5 pm kwH Usage',   // hour 17
+                '6 pm kwH Usage',   // hour 18
+                '7 pm kwH Usage',   // hour 19
+                '8 pm kwH Usage',   // hour 20
+                '9 pm kwH Usage',   // hour 21
+                '10 pm kwH Usage',  // hour 22
+                '11 pm kwH Usage',  // hour 23
+                '12 am kwH Usage'   // hour 0
+            ];
+            
+            // Place 12 am (midnight) at index 0
+            hourlyData[0] = parseFloat(row['12 am kwH Usage'] || row['12 pm kwH Usage'] || 0);
+            
+            // Place 1 am through 11 pm in order
+            for (let i = 0; i < 23; i++) {
+                hourlyData[i + 1] = parseFloat(row[hourMapping[i]] || 0);
+            }
+            
+            return hourlyData;
+        }
+
+        function initializeDateInputs() {
+            if (energyData.length === 0) return;
+            
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+            
+            // Set min/max to actual data range
+            const minDate = energyData[0].date.toISOString().split('T')[0];
+            const maxDate = energyData[energyData.length - 1].date.toISOString().split('T')[0];
+            
+            startDateInput.min = minDate;
+            startDateInput.max = maxDate;
+            endDateInput.min = minDate;
+            endDateInput.max = maxDate;
+            
+            // Default to full range
+            startDateInput.value = minDate;
+            endDateInput.value = maxDate;
+        }
+
+        function applyDateFilter() {
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+            
+            const startDate = new Date(startDateInput.value);
+            const endDate = new Date(endDateInput.value);
+            
+            if (!startDateInput.value || !endDateInput.value) {
+                alert('Please select both start and end dates');
+                return;
+            }
+            
+            if (startDate > endDate) {
+                alert('Start date must be before end date');
+                return;
+            }
+            
+            // Filter data based on selected range
+            filteredData = energyData.filter(day => {
+                return day.date >= startDate && day.date <= endDate;
+            });
+            
+            if (filteredData.length === 0) {
+                alert('No data found in selected date range');
+                filteredData = [...energyData];
+                return;
+            }
+            
+            // Re-render with filtered data
+            renderStats();
+            renderWeeklyChart();
+            populateDaySelector();
+        }
+
+        function resetDateFilter() {
+            filteredData = [...energyData];
+            initializeDateInputs();
+            renderStats();
+            renderWeeklyChart();
+            populateDaySelector();
+        }
+
+        function renderDashboard() {
+            filteredData = [...energyData]; // Initially show all data
+            initializeDateInputs();
+            renderStats();
+            renderWeeklyChart();
+            populateDaySelector();
+        }
+
+        function renderStats() {
+            const statsGrid = document.getElementById('statsGrid');
+            
+            // Get recent data
+            const today = filteredData[filteredData.length - 1];
+            const last7Days = filteredData.slice(-7);
+            const previous7Days = filteredData.slice(-14, -7);
+            
+            // Calculate statistics
+            const dailyUsages = filteredData.map(d => d.dailyUsage);
+            const stats = calculateStats(dailyUsages);
+            const last7Stats = calculateStats(last7Days.map(d => d.dailyUsage));
+            const prev7Stats = calculateStats(previous7Days.map(d => d.dailyUsage));
+            
+            // Find anomalies
+            const anomalies = filteredData.filter(day => 
+                isAnomaly(day.dailyUsage, stats.avg, stats.stdDev)
+            );
+
+            // Today's usage
+            const todayCard = createStatCard(
+                'Today\'s Usage',
+                today.dailyUsage.toFixed(2),
+                'kWh',
+                null,
+                isAnomaly(today.dailyUsage, stats.avg, stats.stdDev) 
+                    ? (today.dailyUsage > stats.avg ? 'High Usage' : 'Low Usage')
+                    : null
+            );
+
+            // Average daily usage
+            const avgCard = createStatCard(
+                'Daily Average',
+                stats.avg.toFixed(2),
+                'kWh',
+                null
+            );
+
+            // This week vs last week
+            const weeklyChange = ((last7Stats.total - prev7Stats.total) / prev7Stats.total) * 100;
+            const weeklyCard = createStatCard(
+                'This Week',
+                last7Stats.total.toFixed(2),
+                'kWh',
+                {
+                    value: weeklyChange,
+                    label: `vs last week`
+                }
+            );
+
+            // Anomalous days count
+            const anomalyCard = createStatCard(
+                'Unusual Days',
+                anomalies.length,
+                `of ${filteredData.length} days`,
+                null
+            );
+
+            statsGrid.innerHTML = '';
+            statsGrid.appendChild(todayCard);
+            statsGrid.appendChild(avgCard);
+            statsGrid.appendChild(weeklyCard);
+            statsGrid.appendChild(anomalyCard);
+        }
+
+        function createStatCard(label, value, unit, change, anomalyBadge) {
+            const card = document.createElement('div');
+            card.className = 'stat-card';
+            
+            let changeHTML = '';
+            if (change) {
+                const direction = change.value >= 0 ? '↑' : '↓';
+                const className = change.value >= 0 ? 'negative' : 'positive';
+                changeHTML = `
+                    <div class="stat-change ${className}">
+                        ${direction} ${Math.abs(change.value).toFixed(1)}% ${change.label}
+                    </div>
+                `;
+            }
+
+            let badgeHTML = '';
+            if (anomalyBadge) {
+                const badgeClass = anomalyBadge.includes('Low') ? 'low' : '';
+                badgeHTML = `<div class="anomaly-badge ${badgeClass}">${anomalyBadge}</div>`;
+            }
+
+            card.innerHTML = `
+                ${badgeHTML}
+                <div class="stat-label">${label}</div>
+                <div class="stat-value">
+                    ${value}
+                    <span class="stat-unit">${unit}</span>
+                </div>
+                ${changeHTML}
+            `;
+            
+            return card;
+        }
+
+        function renderWeeklyChart() {
+            const ctx = document.getElementById('weeklyChart');
+            
+            if (weeklyChart) {
+                weeklyChart.destroy();
+            }
+
+            const labels = filteredData.map(d => formatDate(d.date));
+            const data = filteredData.map(d => d.dailyUsage);
+            
+            const stats = calculateStats(filteredData.map(d => d.dailyUsage));
+            const avgLine = new Array(data.length).fill(stats.avg);
+
+            // Calculate day-of-week averages
+            const dayOfWeekAverages = {};
+            const dayOfWeekCounts = {};
+            
+            // First pass: sum up usage for each day of week
+            filteredData.forEach(day => {
+                const dayName = getDayOfWeek(day.date);
+                if (!dayOfWeekAverages[dayName]) {
+                    dayOfWeekAverages[dayName] = 0;
+                    dayOfWeekCounts[dayName] = 0;
+                }
+                dayOfWeekAverages[dayName] += day.dailyUsage;
+                dayOfWeekCounts[dayName]++;
+            });
+            
+            // Calculate averages
+            Object.keys(dayOfWeekAverages).forEach(dayName => {
+                dayOfWeekAverages[dayName] = dayOfWeekAverages[dayName] / dayOfWeekCounts[dayName];
+            });
+            
+            // Map each date to its day-of-week average
+            const dayOfWeekAvgLine = filteredData.map(day => {
+                const dayName = getDayOfWeek(day.date);
+                return dayOfWeekAverages[dayName];
+            });
+
+            weeklyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Daily Usage',
+                            data: data,
+                            backgroundColor: filteredData.map(d => {
+                                if (isAnomaly(d.dailyUsage, stats.avg, stats.stdDev)) {
+                                    return d.dailyUsage > stats.avg 
+                                        ? 'rgba(231, 76, 60, 0.6)' 
+                                        : 'rgba(46, 204, 113, 0.6)';
+                                }
+                                return 'rgba(253, 184, 19, 0.6)';
+                            }),
+                            borderColor: filteredData.map(d => {
+                                if (isAnomaly(d.dailyUsage, stats.avg, stats.stdDev)) {
+                                    return d.dailyUsage > stats.avg 
+                                        ? '#E74C3C' 
+                                        : '#2ECC71';
+                                }
+                                return '#FDB813';
+                            }),
+                            borderWidth: 2,
+                            borderRadius: 8
+                        },
+                        {
+                            label: 'Overall Average',
+                            data: avgLine,
+                            type: 'line',
+                            borderColor: '#004E89',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            label: 'Day-of-Week Average',
+                            data: dayOfWeekAvgLine,
+                            type: 'line',
+                            borderColor: '#FF6B35',
+                            borderWidth: 2,
+                            borderDash: [10, 5],
+                            pointRadius: 3,
+                            pointBackgroundColor: '#FF6B35',
+                            pointBorderColor: '#FFF',
+                            pointBorderWidth: 2,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: { family: 'Outfit', size: 12, weight: '600' },
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: { family: 'Outfit', size: 13, weight: '600' },
+                            bodyFont: { family: 'JetBrains Mono', size: 12 },
+                            borderColor: '#FDB813',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' kWh';
+                                },
+                                afterLabel: function(context) {
+                                    if (context.datasetIndex === 0) {
+                                        const date = filteredData[context.dataIndex].date;
+                                        const dayName = getDayOfWeek(date);
+                                        return `Day: ${dayName}`;
+                                    }
+                                    return '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Energy Usage (kWh)',
+                                font: { family: 'Outfit', size: 12, weight: '600' }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: { family: 'Outfit', size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function populateDaySelector() {
+            const selector = document.getElementById('daySelector');
+            selector.innerHTML = '<option value="">Select a day...</option>';
+            
+            filteredData.forEach((day, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = formatDate(day.date);
+                selector.appendChild(option);
+            });
+            
+            // Auto-select most recent day
+            if (filteredData.length > 0) {
+                selector.value = filteredData.length - 1;
+                updateDailyView();
+            }
+        }
+
+        function updateDailyView() {
+            const selector = document.getElementById('daySelector');
+            const selectedIndex = parseInt(selector.value);
+            
+            if (isNaN(selectedIndex)) return;
+
+            const selectedDay = filteredData[selectedIndex];
+            renderHourlyChart(selectedDay);
+            renderComparisons(selectedDay, selectedIndex);
+        }
+
+        function renderHourlyChart(day) {
+            const ctx = document.getElementById('hourlyChart');
+            
+            if (hourlyChart) {
+                hourlyChart.destroy();
+            }
+
+            const labels = Array.from({length: 24}, (_, i) => {
+                const hour = i === 0 ? 12 : i > 12 ? i - 12 : i;
+                const period = i < 12 ? 'AM' : 'PM';
+                return `${hour}${period}`;
+            });
+
+            // Calculate average hourly usage across all days
+            const avgHourlyData = new Array(24).fill(0);
+            filteredData.forEach(d => {
+                d.hourlyData.forEach((val, i) => {
+                    avgHourlyData[i] += val;
+                });
+            });
+            avgHourlyData.forEach((val, i) => {
+                avgHourlyData[i] = val / filteredData.length;
+            });
+
+            // Find the index of the selected day in filteredData
+            const selectedIndex = filteredData.findIndex(d => d.date.getTime() === day.date.getTime());
+            
+            // Get past 3 days (if they exist)
+            const pastDays = [];
+            for (let i = 1; i <= 3; i++) {
+                if (selectedIndex - i >= 0) {
+                    pastDays.push(filteredData[selectedIndex - i]);
+                }
+            }
+
+            // Color palette for past days (progressively lighter/more transparent)
+            const pastDayColors = [
+                { border: 'rgba(139, 0, 139, 0.8)', bg: 'rgba(139, 0, 139, 0.05)' },  // Dark purple (1 day ago)
+                { border: 'rgba(147, 112, 219, 0.6)', bg: 'rgba(147, 112, 219, 0.05)' }, // Medium purple (2 days ago)
+                { border: 'rgba(186, 85, 211, 0.4)', bg: 'rgba(186, 85, 211, 0.05)' }   // Light purple (3 days ago)
+            ];
+
+            // Build datasets array
+            const datasets = [
+                {
+                    label: formatDate(day.date) + ' (Selected)',
+                    data: day.hourlyData,
+                    borderColor: '#FF6B35',
+                    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: '#FF6B35'
+                }
+            ];
+
+            // Add past days datasets
+            pastDays.forEach((pastDay, index) => {
+                const colorScheme = pastDayColors[index];
+                const daysAgo = index + 1;
+                datasets.push({
+                    label: formatDate(pastDay.date) + ` (${daysAgo} day${daysAgo > 1 ? 's' : ''} prior)`,
+                    data: pastDay.hourlyData,
+                    borderColor: colorScheme.border,
+                    backgroundColor: colorScheme.bg,
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.4,
+                    pointRadius: 2,
+                    pointHoverRadius: 4,
+                    borderDash: [5, 5]
+                });
+            });
+
+            // Add average line last
+            datasets.push({
+                label: 'Average Day',
+                data: avgHourlyData,
+                borderColor: '#004E89',
+                backgroundColor: 'rgba(0, 78, 137, 0.05)',
+                borderWidth: 2,
+                borderDash: [10, 5],
+                fill: false,
+                tension: 0.4,
+                pointRadius: 0
+            });
+
+            hourlyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: { family: 'Outfit', size: 11, weight: '600' },
+                                padding: 10,
+                                usePointStyle: true,
+                                boxWidth: 6,
+                                boxHeight: 6
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: { family: 'Outfit', size: 13, weight: '600' },
+                            bodyFont: { family: 'JetBrains Mono', size: 11 },
+                            borderColor: '#FDB813',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' kWh';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Hourly Usage (kWh)',
+                                font: { family: 'Outfit', size: 12, weight: '600' }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: { family: 'Outfit', size: 10 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderComparisons(day, dayIndex) {
+            const grid = document.getElementById('comparisonGrid');
+            
+            // Get average for all data
+            const allDailyUsages = energyData.map(d => d.dailyUsage);
+            const overallAvg = calculateStats(allDailyUsages).avg;
+            
+            // Compare with average
+            const vsAvgDiff = ((day.dailyUsage - overallAvg) / overallAvg) * 100;
+            
+            // Compare with same day of week
+            const dayOfWeek = getDayOfWeek(day.date);
+            const sameDayOfWeek = energyData.filter(d => getDayOfWeek(d.date) === dayOfWeek);
+            const sameDayAvg = calculateStats(sameDayOfWeek.map(d => d.dailyUsage)).avg;
+            const vsSameDayDiff = ((day.dailyUsage - sameDayAvg) / sameDayAvg) * 100;
+            
+            // Peak hour
+            const peakHour = day.hourlyData.indexOf(Math.max(...day.hourlyData));
+            const peakHourLabel = peakHour === 0 ? '12 AM' : peakHour > 12 ? `${peakHour - 12} PM` : `${peakHour} AM`;
+            
+            grid.innerHTML = `
+                <div class="comparison-card">
+                    <div class="comparison-title">vs Overall Average</div>
+                    <div class="comparison-value">
+                        ${vsAvgDiff >= 0 ? '+' : ''}${vsAvgDiff.toFixed(1)}%
+                    </div>
+                </div>
+                <div class="comparison-card">
+                    <div class="comparison-title">vs ${dayOfWeek} Average</div>
+                    <div class="comparison-value">
+                        ${vsSameDayDiff >= 0 ? '+' : ''}${vsSameDayDiff.toFixed(1)}%
+                    </div>
+                </div>
+                <div class="comparison-card">
+                    <div class="comparison-title">Peak Hour</div>
+                    <div class="comparison-value">${peakHourLabel}</div>
+                </div>
+            `;
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', loadData);
+    </script>
+</body>
+</html>
