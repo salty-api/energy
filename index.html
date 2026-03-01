@@ -466,6 +466,16 @@
                 </div>
             </div>
 
+            <!-- Monthly Overview Chart -->
+            <div class="chart-section">
+                <div class="section-header">
+                    <h2 class="section-title">📅 Monthly Energy Overview (Past 12 Months)</h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+            </div>
+
             <!-- Daily Deep Dive -->
             <div class="chart-section">
                 <div class="section-header">
@@ -495,6 +505,7 @@
         let energyData = [];
         let filteredData = []; // Stores filtered data based on date range
         let weeklyChart = null;
+        let monthlyChart = null;
         let hourlyChart = null;
 
         // Utility functions
@@ -794,6 +805,7 @@
             initializeDateInputs();
             renderStats();
             renderWeeklyChart();
+            renderMonthlyChart();
             populateDaySelector();
         }
 
@@ -1040,6 +1052,184 @@
                             },
                             ticks: {
                                 font: { family: 'Outfit', size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderMonthlyChart() {
+            const ctx = document.getElementById('monthlyChart');
+            
+            if (monthlyChart) {
+                monthlyChart.destroy();
+            }
+
+            // Get all data (not filtered - we want full 12 months)
+            if (energyData.length === 0) return;
+
+            // Group data by month
+            const monthlyData = {};
+            
+            energyData.forEach(day => {
+                const monthKey = `${day.date.getFullYear()}-${String(day.date.getMonth() + 1).padStart(2, '0')}`;
+                
+                if (!monthlyData[monthKey]) {
+                    monthlyData[monthKey] = {
+                        total: 0,
+                        days: [],
+                        year: day.date.getFullYear(),
+                        month: day.date.getMonth()
+                    };
+                }
+                
+                monthlyData[monthKey].total += day.dailyUsage;
+                monthlyData[monthKey].days.push(day.dailyUsage);
+            });
+
+            // Sort months chronologically and get last 12
+            const sortedMonths = Object.keys(monthlyData).sort().slice(-12);
+            
+            // Prepare chart data
+            const labels = sortedMonths.map(key => {
+                const [year, month] = key.split('-');
+                const date = new Date(year, parseInt(month) - 1);
+                return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            });
+
+            const monthlyTotals = sortedMonths.map(key => monthlyData[key].total);
+            
+            // Calculate weekly averages for each month (total / number of weeks in that month)
+            const weeklyAverages = sortedMonths.map(key => {
+                const data = monthlyData[key];
+                const numDays = data.days.length;
+                const numWeeks = numDays / 7;
+                return data.total / numWeeks;
+            });
+
+            // Find min/max for better visualization
+            const maxTotal = Math.max(...monthlyTotals);
+            const minTotal = Math.min(...monthlyTotals);
+
+            monthlyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Total Monthly Usage',
+                            data: monthlyTotals,
+                            backgroundColor: 'rgba(253, 184, 19, 0.6)',
+                            borderColor: '#FDB813',
+                            borderWidth: 2,
+                            borderRadius: 8,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Weekly Average',
+                            data: weeklyAverages,
+                            type: 'line',
+                            borderColor: '#004E89',
+                            backgroundColor: 'rgba(0, 78, 137, 0.1)',
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#004E89',
+                            pointBorderColor: '#FFF',
+                            pointBorderWidth: 2,
+                            fill: false,
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: { family: 'Outfit', size: 12, weight: '600' },
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: { family: 'Outfit', size: 13, weight: '600' },
+                            bodyFont: { family: 'JetBrains Mono', size: 12 },
+                            borderColor: '#FDB813',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y.toFixed(2);
+                                    return label + ': ' + value + ' kWh';
+                                },
+                                footer: function(items) {
+                                    if (items.length > 0) {
+                                        const monthKey = sortedMonths[items[0].dataIndex];
+                                        const numDays = monthlyData[monthKey].days.length;
+                                        return `Days in month: ${numDays}`;
+                                    }
+                                    return '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Total Monthly Usage (kWh)',
+                                font: { family: 'Outfit', size: 12, weight: '600' },
+                                color: '#FDB813'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                color: '#666'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Weekly Average (kWh)',
+                                font: { family: 'Outfit', size: 12, weight: '600' },
+                                color: '#004E89'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: '#666'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: { family: 'Outfit', size: 11 },
+                                maxRotation: 45,
+                                minRotation: 45
                             }
                         }
                     }
